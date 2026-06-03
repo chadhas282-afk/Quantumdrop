@@ -327,6 +327,13 @@ export function useWebRTC(role: "sender" | "receiver" = "sender"): UseWebRTCRetu
     socket.on("answer", async ({ answer }: { answer: RTCSessionDescriptionInit }) => {
       if (peerRef.current) {
         await peerRef.current.setRemoteDescription(answer);
+        remoteDescSetRef.current = true;
+
+        // Flush any ICE candidates that arrived before the remote description
+        for (const candidate of pendingCandidatesRef.current) {
+          await peerRef.current.addIceCandidate(candidate);
+        }
+        pendingCandidatesRef.current = [];
       }
     });
 
