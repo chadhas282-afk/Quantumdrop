@@ -23,7 +23,7 @@ import { generateRoomId } from "@/lib/roomId";
  * Compute signaling server URL at runtime.
  *
  * Priority:
- * 1. NEXT_PUBLIC_SIGNALING_URL env var (set this on Vercel → Railway URL)
+ * 1. NEXT_PUBLIC_SIGNALING_URL env var (Render Blueprint auto-sets this)
  * 2. Local dev: derive from window.location.hostname so mobile on the LAN
  *    automatically uses the Mac's real IP (e.g. http://192.168.0.182:3001)
  * 3. Absolute fallback: localhost:3001
@@ -34,11 +34,11 @@ function getSignalingUrl(): string {
   }
   if (typeof window !== "undefined") {
     const { protocol, hostname } = window.location;
-    // In production on Vercel there is no port 3001 — the env var MUST be set
+    // In production on Render there is no port 3001 — the env var MUST be set
     if (process.env.NODE_ENV === "production") {
       console.error(
         "[QuantumDrop] NEXT_PUBLIC_SIGNALING_URL is not set! " +
-        "Deploy the signaling server to Railway and add the URL to Vercel env vars."
+        "Ensure you deployed using the render.yaml Blueprint."
       );
     }
     return `${protocol}//${hostname}:3001`;

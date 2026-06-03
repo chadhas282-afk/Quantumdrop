@@ -11,11 +11,11 @@ Browser A (Sender) ──── WebRTC DataChannel ────► Browser B (Re
          │                                                │
          └──── WebSocket (SDP offer/answer only) ────────┘
                        Signaling Server
-                    (Railway — ephemeral)
+                    (Render — ephemeral)
 ```
 
-The **Next.js app** runs on **Vercel**.  
-The **signaling server** runs on **Railway** (free tier).  
+The **Next.js app** and the **signaling server** both run on **Render**.
+The **signaling server** runs on **Render** (free tier).  
 File data travels exclusively through the WebRTC DataChannel — never through any server.
 
 ---
@@ -34,33 +34,28 @@ To test from a phone on the same WiFi, open the **Network URL** shown in the ter
 
 ---
 
-## Deployment
+## Deployment (1-Click on Render)
 
-### Step 1 — Deploy the Signaling Server to Railway
+Both the Next.js frontend and the Signaling Server are deployed together on Render using the included `render.yaml` Blueprint. This handles everything automatically, including linking the two services together via environment variables.
 
-1. Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
-2. Select this repository
-3. Railway will auto-detect the `Procfile` and run `node server/signaling.js`
-4. Once deployed, copy the public URL (e.g. `https://quantumdrop-signaling.railway.app`)
+### Step 1 — Deploy to Render
 
-> **Free tier note:** Railway's free tier (Hobby) gives 500 hours/month — enough for a personal app. The signaling server uses minimal resources since it only handles WebRTC handshakes (~1KB per connection).
+1. Go to [render.com](https://render.com) and create an account if needed.
+2. In the Render Dashboard, click **New +** -> **Blueprint**.
+3. Connect your GitHub account and select this repository.
+4. Render will read the `render.yaml` file and automatically configure **two** Web Services:
+   * `quantumdrop-signaling` (The backend websocket server)
+   * `quantumdrop-frontend` (The Next.js app)
+5. Click **Apply**.
+6. Render will automatically pass the signaling server's URL to the Next.js frontend during the build.
+7. Once deployed, open the URL for `quantumdrop-frontend` (e.g. `https://quantumdrop-frontend.onrender.com`).
 
-### Step 2 — Deploy the Next.js App to Vercel
+> **Free tier note:** Render's free tier spins down after 15 minutes of inactivity. When a new user tries to connect, it may take ~50 seconds for the apps to spin back up.
 
-1. Go to [vercel.com](https://vercel.com) → **New Project → Import Git Repository**
-2. Select this repository
-3. In **Environment Variables**, add:
-   ```
-   NEXT_PUBLIC_SIGNALING_URL = https://your-app.railway.app
-   ```
-4. Click **Deploy**
+### Step 2 — Verify
 
-That's it. Vercel auto-detects Next.js and builds it correctly.
-
-### Step 3 — Verify
-
-1. Open your Vercel URL
-2. Drop a file → a QR code appears with your Vercel HTTPS URL
+1. Open your Render frontend URL
+2. Drop a file → a QR code appears with your Render HTTPS URL
 3. Scan the QR on your phone → receiver page opens
 4. File transfers directly P2P and downloads automatically
 
@@ -70,7 +65,7 @@ That's it. Vercel auto-detects Next.js and builds it correctly.
 
 | Variable | Required | Description |
 |---|---|---|
-| `NEXT_PUBLIC_SIGNALING_URL` | **Yes (production)** | Full URL of the Railway signaling server, e.g. `https://quantumdrop-signaling.railway.app` |
+| `NEXT_PUBLIC_SIGNALING_URL` | **Auto-configured** | The Render Blueprint automatically passes this from the signaling service to the frontend. |
 
 Copy `.env.example` to `.env.local` for local development.
 
@@ -83,7 +78,7 @@ Copy `.env.example` to `.env.local` for local development.
 | Frontend | Next.js 16 (App Router) + TypeScript |
 | Styling | Tailwind CSS v4 + Framer Motion |
 | P2P Engine | Native `RTCDataChannel` (WebRTC) |
-| Signaling | Socket.io (Node.js, deployed on Railway) |
+| Signaling | Socket.io (Node.js, deployed on Render) |
 | Large file assembly | OPFS → Blob fallback |
 | Wake Lock | Screen Wake Lock API |
 

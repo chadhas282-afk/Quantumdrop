@@ -1,0 +1,26 @@
+services:
+  # 1. Signaling Server
+  - type: web
+    name: quantumdrop-signaling
+    env: node
+    buildCommand: npm install
+    startCommand: node server/signaling.js
+    envVars:
+      - key: NODE_VERSION
+        value: ~20
+
+  # 2. Next.js Frontend
+  - type: web
+    name: quantumdrop-frontend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: ~20
+      # Automatically fetch the signaling server's public URL and give it to Next.js
+      - key: NEXT_PUBLIC_SIGNALING_URL
+        fromService:
+          type: web
+          name: quantumdrop-signaling
+          envVarKey: RENDER_EXTERNAL_URL
