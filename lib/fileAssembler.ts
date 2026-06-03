@@ -10,6 +10,7 @@ export interface AssemblyContext {
   opfsWritable?: FileSystemWritableFileStream;
   opfsFile?: FileSystemFileHandle;
   bytesReceived: number;
+  writeQueue: Promise<void>;
 }
 
 export interface ReceivedFileInfo {
@@ -41,6 +42,7 @@ export async function initAssembly(
         opfsWritable: writable,
         opfsFile: fileHandle,
         bytesReceived: 0,
+        writeQueue: Promise.resolve(),
       };
     } catch {
       // Fall through to Blob strategy
@@ -52,20 +54,22 @@ export async function initAssembly(
     strategy: "blob",
     chunks: [],
     bytesReceived: 0,
+    writeQueue: Promise.resolve(),
   };
 }
 
 /**
  * Append a received chunk to the assembly context.
  */
-export async function appendChunk(
+export function appendChunk(
   ctx: AssemblyContext,
   chunk: ArrayBuffer
-): Promise<void> {
+): void {
   ctx.bytesReceived += chunk.byteLength;
 
   if (ctx.strategy === "opfs" && ctx.opfsWritable) {
-    await ctx.opfsWritable.write(chunk);
+    // Chain the promise to ensure chunks are written in exactly the order they arrived
+    ctx.writeQueue = ctx.writeQueue.then(() => ctx.opfsWritable!.write(chunk));
   } else {
     ctx.chunks.push(chunk);
   }
@@ -79,6 +83,9 @@ export async function finalizeAndDownload(
   fileInfo: ReceivedFileInfo
 ): Promise<void> {
   let url: string;
+
+  // Wait for all pending writes to complete before finishing
+  await ctx.writeQueue;
 
   if (ctx.strategy === "opfs" && ctx.opfsWritable && ctx.opfsFile) {
     await ctx.opfsWritable.close();

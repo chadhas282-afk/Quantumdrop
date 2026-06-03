@@ -225,7 +225,7 @@ export function useWebRTC(role: "sender" | "receiver" = "sender"): UseWebRTCRetu
           } else if (event.data instanceof ArrayBuffer) {
             // Binary chunk
             if (assemblyRef.current) {
-              await appendChunk(assemblyRef.current, event.data);
+              appendChunk(assemblyRef.current, event.data);
               setBytesTransferred(assemblyRef.current.bytesReceived);
             }
           }
