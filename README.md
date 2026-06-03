@@ -1,36 +1,100 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ⚡ QuantumDrop
 
-## Getting Started
+**Zero-cloud P2P file transfer.** Send any file, any size, directly browser-to-browser via WebRTC. No accounts. No cloud storage. Files never touch a server.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Architecture
+
+```
+Browser A (Sender) ──── WebRTC DataChannel ────► Browser B (Receiver)
+         │                                                │
+         └──── WebSocket (SDP offer/answer only) ────────┘
+                       Signaling Server
+                    (Railway — ephemeral)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The **Next.js app** runs on **Vercel**.  
+The **signaling server** runs on **Railway** (free tier).  
+File data travels exclusively through the WebRTC DataChannel — never through any server.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Local Development
 
-## Learn More
+```bash
+# Terminal 1 — Signaling server (port 3001)
+npm run signaling
 
-To learn more about Next.js, take a look at the following resources:
+# Terminal 2 — Next.js frontend (port 3000)
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+To test from a phone on the same WiFi, open the **Network URL** shown in the terminal (e.g. `http://192.168.0.182:3000`), not `localhost`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Deployment
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Step 1 — Deploy the Signaling Server to Railway
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
+2. Select this repository
+3. Railway will auto-detect the `Procfile` and run `node server/signaling.js`
+4. Once deployed, copy the public URL (e.g. `https://quantumdrop-signaling.railway.app`)
+
+> **Free tier note:** Railway's free tier (Hobby) gives 500 hours/month — enough for a personal app. The signaling server uses minimal resources since it only handles WebRTC handshakes (~1KB per connection).
+
+### Step 2 — Deploy the Next.js App to Vercel
+
+1. Go to [vercel.com](https://vercel.com) → **New Project → Import Git Repository**
+2. Select this repository
+3. In **Environment Variables**, add:
+   ```
+   NEXT_PUBLIC_SIGNALING_URL = https://your-app.railway.app
+   ```
+4. Click **Deploy**
+
+That's it. Vercel auto-detects Next.js and builds it correctly.
+
+### Step 3 — Verify
+
+1. Open your Vercel URL
+2. Drop a file → a QR code appears with your Vercel HTTPS URL
+3. Scan the QR on your phone → receiver page opens
+4. File transfers directly P2P and downloads automatically
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_SIGNALING_URL` | **Yes (production)** | Full URL of the Railway signaling server, e.g. `https://quantumdrop-signaling.railway.app` |
+
+Copy `.env.example` to `.env.local` for local development.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 16 (App Router) + TypeScript |
+| Styling | Tailwind CSS v4 + Framer Motion |
+| P2P Engine | Native `RTCDataChannel` (WebRTC) |
+| Signaling | Socket.io (Node.js, deployed on Railway) |
+| Large file assembly | OPFS → Blob fallback |
+| Wake Lock | Screen Wake Lock API |
+
+---
+
+## How It Works
+
+1. **Sender** drops a file → app generates a cryptographic room ID
+2. Sender connects to signaling server → receives a share link + QR code
+3. **Receiver** opens the link → both peers exchange SDP offer/answer via WebSocket
+4. WebRTC DataChannel opens → **signaling WebSocket disconnects** (true P2P isolation)
+5. File is sliced into 16KB chunks and streamed with backpressure control
+6. Receiver assembles chunks via OPFS (Chrome) or Blob array (Firefox/Safari)
+7. Download triggers automatically when the last chunk arrives
